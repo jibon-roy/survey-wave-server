@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config()
+const jwt = require('jsonwebtoken')
 const stripe = require('stripe')(process.env.STRYP_SECRET_KEY)
 const moment = require('moment');
 
@@ -37,6 +38,14 @@ async function run() {
 
         const db = await client.db('SurveyWave');
         const usersDataCollection = db.collection('usersData');
+
+        // Jwt api
+        app.post('/jwt', async (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+            res.send({ token })
+
+        })
 
         app.post('/newUser', async (req, res) => {
             const userData = req.body;

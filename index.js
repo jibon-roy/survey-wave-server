@@ -62,6 +62,11 @@ async function run() {
 
         })
 
+        app.get('/allUser', async (req, res) => {
+            const result = await usersDataCollection.find().toArray()
+            res.send(result);
+        })
+
         // Payment Intent 
         app.post('/create-payment-intent', async (req, res) => {
             const price = req.body;
@@ -77,6 +82,7 @@ async function run() {
             })
         })
 
+        // Pro user buying api
         app.patch('/buyPro', async (req, res) => {
             const data = req.body;
             const filter = { email: data.email }
@@ -89,7 +95,7 @@ async function run() {
             const result = await usersDataCollection.updateOne(filter, update, option)
             res.send(result);
         })
-
+        // Check user role
         app.post('/check-role', async (req, res) => {
             const user = await req.body;
             const query = { email: user.email }

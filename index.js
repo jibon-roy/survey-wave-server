@@ -3,7 +3,8 @@ const cors = require('cors');
 require('dotenv').config()
 const jwt = require('jsonwebtoken')
 const stripe = require('stripe')(process.env.STRYP_SECRET_KEY)
-const moment = require('moment');
+const moment = require('moment-timezone');
+
 
 
 const app = express();
@@ -19,7 +20,7 @@ app.use(express.json())
 
 
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.ziw2dg7.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -35,9 +36,10 @@ async function run() {
     try {
 
         await client.connect();
-
+        // Db collections
         const db = await client.db('SurveyWave');
         const usersDataCollection = db.collection('usersData');
+        const surveyDataCollection = db.collection('allSurveys');
 
         // Jwt api
         app.post('/jwt', async (req, res) => {
@@ -47,6 +49,7 @@ async function run() {
 
         })
 
+        // Creating new user
         app.post('/newUser', async (req, res) => {
             const userData = req.body;
             const query = {
@@ -62,9 +65,28 @@ async function run() {
 
         })
 
-        app.get('/allUser', async (req, res) => {
-            const result = await usersDataCollection.find().toArray()
-            res.send(result);
+        app.post('/allUsers', async (req, res) => {
+            const filter = req?.body;
+            if (filter.role === 'allUsers') {
+                const result = await usersDataCollection.find().toArray()
+                return res.send(result);
+
+            } else {
+                const query = {
+                    role: filter.role
+                }
+                const result = await usersDataCollection.find(query).toArray()
+                return res.send(result);
+            }
+
+        })
+
+        // Delete User
+        app.delete('/deleteUser', async (req, res) => {
+            const id = req.query.userId;
+            const query = { _id: new ObjectId(id) }
+            const result = await usersDataCollection.deleteOne(query);
+            res.send(result)
         })
 
         // Payment Intent 
@@ -104,6 +126,103 @@ async function run() {
             const setRole = await role?.role;
             res.send({ role: setRole })
         })
+
+        // Admin make action api
+        app.put('/changeRole', async (req, res) => {
+            const role = req.body;
+            const id = role.id;
+            const query = { _id: new ObjectId(id) }
+            const update = { $set: { role: role.role } }
+            const result = await usersDataCollection.updateOne(query, update, { upsert: true })
+            res.send(result)
+        })
+
+        // survey post api
+        app.post('/postSurvey', async (req, res) => {
+            const survey = req.body;
+
+            const timezone = req.body.timezone || 'UTC'
+            survey.publishedDate = moment.tz(timezone).format()
+            const deadlineDate = req.body.deadline
+            const parsedDate = moment(deadlineDate, 'YYYY/MM/DD');
+            const utcDate = parsedDate.utc();
+            survey.deadline = utcDate.format();
+            const postSurvey = await surveyDataCollection.insertOne(survey);
+            res.send(postSurvey);
+        })
+
+        // Get all posted surveys
+        app.get('/surveys', async (req, res) => {
+            const query = { publish: true }
+            const result = await surveyDataCollection.find(query).toArray();
+            res.send(result);
+        })
+
+        app.get('/surveys/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const result = await surveyDataCollection.findOne(query)
+            res.send(result);
+        })
+
+        // Voting api
+        app.put('/addVote/:id', async (req, res) => {
+            const id = req.params.id
+            const addVote = req.body
+            const query = { _id: new ObjectId(id) }
+            if (addVote.vote === 'Yes') {
+                const update = {
+                    $push: {
+                        totalTrueVote: addVote.user
+                    }
+                }
+                const result = await surveyDataCollection.updateOne(query, update)
+                res.send(result)
+            }
+            if (addVote.vote === 'No') {
+                const update = {
+                    $push: {
+                        totalFalseVote: addVote.user
+                    }
+                }
+                const result = await surveyDataCollection.updateOne(query, update)
+                res.send(result)
+            }
+            // const result = await surveyDataCollection.updateOne(query)
+            // res.send(query)
+        })
+        // like related api
+        app.put('/addLike/:id', async (req, res) => {
+            const id = req.params.id
+            const addLike = req.body
+            const query = { _id: new ObjectId(id) }
+            const update = {
+                $push: {
+                    totalLike: addLike.user
+                }
+            }
+            const result = await surveyDataCollection.updateOne(query, update)
+            res.send(result)
+
+            // const result = await surveyDataCollection.updateOne(query)
+            // res.send(query)
+        })
+        app.put('/disLike/:id', async (req, res) => {
+            const id = req.params.id
+            const addLike = req.body
+            const query = { _id: new ObjectId(id) }
+            const update = {
+                $push: {
+                    totalDisLike: addLike.user
+                }
+            }
+            const result = await surveyDataCollection.updateOne(query, update)
+            res.send(result)
+
+            // const result = await surveyDataCollection.updateOne(query)
+            // res.send(query)
+        })
+
 
         // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");

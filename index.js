@@ -49,6 +49,24 @@ async function run() {
 
         })
 
+
+        // jwt middleware for check token
+        const tokenVerify = (req, res, next) => {
+            if (!req.headers.authorization) {
+                return res.status(401).send({ message: 'Forbidden access' })
+            }
+            const token = req.headers.authorization.split(' ')[1]
+            jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+                if (err) {
+                    return res.status(401).send({ message: 'Unauthorized user' })
+                }
+                req.decoded = decoded
+                // console.log(req.decoded)
+                next();
+            })
+        }
+
+
         // Creating new user
         app.post('/newUser', async (req, res) => {
             const userData = req.body;
@@ -65,7 +83,7 @@ async function run() {
 
         })
 
-        app.post('/allUsers', async (req, res) => {
+        app.post('/allUsers', tokenVerify, async (req, res) => {
             const filter = req?.body;
             if (filter.role === 'allUsers') {
                 const result = await usersDataCollection.find().toArray()
@@ -76,6 +94,7 @@ async function run() {
                     role: filter.role
                 }
                 const result = await usersDataCollection.find(query).toArray()
+                // console.log(result)
                 return res.send(result);
             }
 
@@ -119,20 +138,28 @@ async function run() {
         })
 
         //  Paid user data api
-        app.post('/paidUsers', async (req, res) => {
+        app.post('/paidUsers', tokenVerify, async (req, res) => {
             const data = req.body
             const result = await paymentDataCollection.insertOne(data);
             res.status(200).send(result)
         })
 
-        // Check user role
-        app.post('/check-role', async (req, res) => {
-            const user = await req.body;
-            const query = { email: user.email }
+        app.get('/getPaidUsers', async (req, res) => {
+            const result = await paymentDataCollection.find().toArray();
+            res.send(result)
+        })
 
-            const role = await usersDataCollection.findOne(query);
-            const setRole = await role?.role;
-            res.send({ role: setRole })
+        // Check user role
+        app.get('/check-role/:email', tokenVerify, async (req, res) => {
+            const email = await req.params.email;
+            // console.log(req.decoded)
+            if (email != req.decoded.email) {
+                return res.status(403).send({ message: 'Unauthorized access.' })
+            }
+            const query = { email: email }
+
+            const user = await usersDataCollection.findOne(query);
+            res.send({ role: user.role })
         })
 
         // Admin make action api

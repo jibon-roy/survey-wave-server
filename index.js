@@ -40,7 +40,7 @@ async function run() {
         const db = await client.db('SurveyWave');
         const usersDataCollection = db.collection('usersData');
         const surveyDataCollection = db.collection('allSurveys');
-
+        const paymentDataCollection = db.collection('payments')
         // Jwt api
         app.post('/jwt', async (req, res) => {
             const user = req.body;
@@ -117,6 +117,14 @@ async function run() {
             const result = await usersDataCollection.updateOne(filter, update, option)
             res.send(result);
         })
+
+        //  Paid user data api
+        app.post('/paidUsers', async (req, res) => {
+            const data = req.body
+            const result = await paymentDataCollection.insertOne(data);
+            res.status(200).send(result)
+        })
+
         // Check user role
         app.post('/check-role', async (req, res) => {
             const user = await req.body;
@@ -151,10 +159,57 @@ async function run() {
             res.send(postSurvey);
         })
 
+
+        // Update survey
+        app.patch('/updateSurvey/:id', async (req, res) => {
+            const id = req.params.id;
+            const updateData = req.body;
+            const query = { _id: new ObjectId(id) }
+            const deadlineDate = req.body.deadline
+            const parsedDate = moment(deadlineDate, 'YYYY/MM/DD');
+            const utcDate = parsedDate.utc();
+            const update = {
+                $set: {
+                    title: updateData.title,
+                    body: updateData.body,
+                    category: updateData.category,
+                    deadline: utcDate.format()
+                }
+            }
+            const updateSurvey = await surveyDataCollection.updateOne(query, update, { upsert: true })
+            res.send(updateSurvey);
+        })
+
+        // Delete Survey
+        app.patch('/reportSurvey/:id', async (req, res) => {
+            const id = req.params.id;
+            const updateData = req.body;
+            console.log(updateData)
+            const query = { _id: new ObjectId(id) }
+            const update = {
+                $set: {
+                    adminComment: updateData.adminComment,
+                    publish: updateData.status === 'false' ? false : true,
+                }
+            }
+            const result = await surveyDataCollection.updateOne(query, update, { upsert: true });
+            res.send(result)
+        })
+        app.delete('/deleteSurvey/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const result = await surveyDataCollection.deleteOne(query);
+            res.send(result)
+        })
+
         // Get all posted surveys
         app.get('/surveys', async (req, res) => {
             const query = { publish: true }
             const result = await surveyDataCollection.find(query).toArray();
+            res.send(result);
+        })
+        app.get('/allAdminSurveys', async (req, res) => {
+            const result = await surveyDataCollection.find().toArray();
             res.send(result);
         })
 
@@ -162,6 +217,13 @@ async function run() {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const result = await surveyDataCollection.findOne(query)
+            res.send(result);
+        })
+
+        app.get('/specificSurvey/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { surveyor: email }
+            const result = await surveyDataCollection.find(query).toArray()
             res.send(result);
         })
 

@@ -13,7 +13,7 @@ const port = process.env.PORT | 5000;
 // middleWare
 app.use(
     cors({
-        origin: ['http://localhost:5173', 'https://enmmedia.web.app'],
+        origin: ['https://survey-wave-site.web.app', 'http://localhost:5173', 'http://localhost:5174',],
     }),
 )
 app.use(express.json())
@@ -35,7 +35,7 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
 
-        await client.connect();
+        // await client.connect();
         // Db collections
         const db = await client.db('SurveyWave');
         const usersDataCollection = db.collection('usersData');
@@ -408,7 +408,7 @@ async function run() {
 run().catch(console.dir);
 
 
-app.get('/status', (req, res) => {
+app.get('/', (req, res) => {
     res.send("Server is running.");
 })
 

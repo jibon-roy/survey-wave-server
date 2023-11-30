@@ -66,6 +66,49 @@ async function run() {
             })
         }
 
+        // After verify token verify the admin
+        const adminVerify = async (req, res, next) => {
+            const email = req.decoded.email
+            const query = { email: email }
+            const user = await usersDataCollection.findOne(query);
+            if (user?.role !== 'admin') {
+                return res.status(401).send({ message: 'Unauthorized access' })
+            }
+            next()
+        }
+        const surveyorVerify = async (req, res, next) => {
+            const email = req.decoded.email
+            const query = { email: email }
+            const user = await usersDataCollection.findOne(query);
+            if (user?.role !== 'surveyor') {
+                return res.status(401).send({ message: 'Unauthorized access' })
+            }
+            next()
+        }
+
+        const proVerify = async (req, res, next) => {
+            const email = req.decoded.email
+            const query = { email: email }
+            const user = await usersDataCollection.findOne(query);
+            if (user?.role !== 'pro') {
+                return res.status(401).send({ message: 'Unauthorized access' })
+            }
+            next()
+        }
+
+
+
+        const adminSurveyorVerify = async (req, res, next) => {
+            if (tokenVerify || adminVerify || surveyorVerify) {
+                next()
+            }
+        }
+        const adminProSurveyorVerify = async (req, res, next) => {
+            if (tokenVerify || adminVerify || surveyorVerify || proVerify) {
+                next()
+            }
+        }
+
 
         // Creating new user
         app.post('/newUser', async (req, res) => {
@@ -83,8 +126,9 @@ async function run() {
 
         })
 
-        app.post('/allUsers', tokenVerify, async (req, res) => {
-            const filter = req?.body;
+        app.post('/allUsers', tokenVerify, adminVerify, async (req, res) => {
+            const filter = req.body;
+            // console.log(filter)
             if (filter.role === 'allUsers') {
                 const result = await usersDataCollection.find().toArray()
                 return res.send(result);
@@ -99,9 +143,15 @@ async function run() {
             }
 
         })
+        app.get('/all-user', tokenVerify, adminSurveyorVerify, async (req, res) => {
+            const result = await usersDataCollection.find().toArray()
+            // console.log(result)
+            return res.send(result);
+        }
+        )
 
         // Delete User
-        app.delete('/deleteUser', async (req, res) => {
+        app.delete('/deleteUser', tokenVerify, adminVerify, async (req, res) => {
             const id = req.query.userId;
             const query = { _id: new ObjectId(id) }
             const result = await usersDataCollection.deleteOne(query);
@@ -138,32 +188,41 @@ async function run() {
         })
 
         //  Paid user data api
-        app.post('/paidUsers', tokenVerify, async (req, res) => {
+        app.post('/paidUsers', async (req, res) => {
             const data = req.body
             const result = await paymentDataCollection.insertOne(data);
             res.status(200).send(result)
         })
 
-        app.get('/getPaidUsers', async (req, res) => {
+        app.get('/getPaidUsers', tokenVerify, adminVerify, async (req, res) => {
             const result = await paymentDataCollection.find().toArray();
             res.send(result)
         })
 
-        // Check user role
-        app.get('/check-role/:email', tokenVerify, async (req, res) => {
-            const email = await req.params.email;
-            // console.log(req.decoded)
-            if (email != req.decoded.email) {
-                return res.status(403).send({ message: 'Unauthorized access.' })
-            }
-            const query = { email: email }
 
+        // Check user role
+        app.get('/check-role/:email', async (req, res) => {
+            const email = await req.params.email;
+            const query = { email: email }
             const user = await usersDataCollection.findOne(query);
             res.send({ role: user.role })
         })
 
+        // Check user role
+        // app.get('/check-role/:email', async (req, res) => {
+        //     const email = await req.params.email;
+        //     // console.log(req.decoded)
+        //     if (email !== req.decoded.email) {
+        //         return res.status(401).send({ message: 'Unauthorized user' })
+        //     }
+        //     const query = { email: email }
+
+        //     const user = await usersDataCollection.findOne(query);
+        //     res.send({ role: user.role })
+        // })
+
         // Admin make action api
-        app.put('/changeRole', async (req, res) => {
+        app.put('/changeRole', tokenVerify, adminVerify, async (req, res) => {
             const role = req.body;
             const id = role.id;
             const query = { _id: new ObjectId(id) }
@@ -173,7 +232,7 @@ async function run() {
         })
 
         // survey post api
-        app.post('/postSurvey', async (req, res) => {
+        app.post('/postSurvey', tokenVerify, adminSurveyorVerify, async (req, res) => {
             const survey = req.body;
 
             const timezone = req.body.timezone || 'UTC'
@@ -188,7 +247,7 @@ async function run() {
 
 
         // Update survey
-        app.patch('/updateSurvey/:id', async (req, res) => {
+        app.patch('/updateSurvey/:id', tokenVerify, adminSurveyorVerify, async (req, res) => {
             const id = req.params.id;
             const updateData = req.body;
             const query = { _id: new ObjectId(id) }
@@ -208,10 +267,9 @@ async function run() {
         })
 
         // Delete Survey
-        app.patch('/reportSurvey/:id', async (req, res) => {
+        app.patch('/reportSurvey/:id', tokenVerify, adminVerify, async (req, res) => {
             const id = req.params.id;
             const updateData = req.body;
-            console.log(updateData)
             const query = { _id: new ObjectId(id) }
             const update = {
                 $set: {
@@ -222,7 +280,7 @@ async function run() {
             const result = await surveyDataCollection.updateOne(query, update, { upsert: true });
             res.send(result)
         })
-        app.delete('/deleteSurvey/:id', async (req, res) => {
+        app.delete('/deleteSurvey/:id', tokenVerify, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const result = await surveyDataCollection.deleteOne(query);
@@ -235,7 +293,7 @@ async function run() {
             const result = await surveyDataCollection.find(query).toArray();
             res.send(result);
         })
-        app.get('/allAdminSurveys', async (req, res) => {
+        app.get('/allAdminSurveys', tokenVerify, adminVerify, async (req, res) => {
             const result = await surveyDataCollection.find().toArray();
             res.send(result);
         })
@@ -247,7 +305,7 @@ async function run() {
             res.send(result);
         })
 
-        app.get('/specificSurvey/:email', async (req, res) => {
+        app.get('/specificSurvey/:email', tokenVerify, async (req, res) => {
             const email = req.params.email;
             const query = { surveyor: email }
             const result = await surveyDataCollection.find(query).toArray()
@@ -255,7 +313,7 @@ async function run() {
         })
 
         // Voting api
-        app.put('/addVote/:id', async (req, res) => {
+        app.put('/addVote/:id', tokenVerify, async (req, res) => {
             const id = req.params.id
             const addVote = req.body
             const query = { _id: new ObjectId(id) }
@@ -281,7 +339,7 @@ async function run() {
             // res.send(query)
         })
         // like related api
-        app.put('/addLike/:id', async (req, res) => {
+        app.put('/addLike/:id', tokenVerify, async (req, res) => {
             const id = req.params.id
             const addLike = req.body
             const query = { _id: new ObjectId(id) }
@@ -296,7 +354,7 @@ async function run() {
             // const result = await surveyDataCollection.updateOne(query)
             // res.send(query)
         })
-        app.put('/disLike/:id', async (req, res) => {
+        app.put('/disLike/:id', tokenVerify, async (req, res) => {
             const id = req.params.id
             const addLike = req.body
             const query = { _id: new ObjectId(id) }
@@ -312,9 +370,30 @@ async function run() {
             // res.send(query)
         })
 
+        app.post('/comments/:id', tokenVerify, adminProSurveyorVerify, async (req, res) => {
+            const comment = req.body
+            const id = req.params.id
+            console.log(comment, id)
+            const query = { _id: new ObjectId(id) }
+            const update = {
+                $push: {
+                    totalComments: comment
+                }
+            }
+            const result = await surveyDataCollection.updateOne(query, update)
+            res.send(result)
+        })
+
+        // app.get('/comments/comment/:id', async (req, res) => {
+        //     const id = req.params.id
+        //     const query = { _id: new ObjectId(id) }
+        //     const result = await surveyDataCollection.findOne(query)
+        //     res.send(result);
+        // })
+
 
         // await client.db("admin").command({ ping: 1 });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
         // await client.close();

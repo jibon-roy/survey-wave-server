@@ -373,7 +373,6 @@ async function run() {
         app.post('/comments/:id', tokenVerify, adminProSurveyorVerify, async (req, res) => {
             const comment = req.body
             const id = req.params.id
-            console.log(comment, id)
             const query = { _id: new ObjectId(id) }
             const update = {
                 $push: {
@@ -384,12 +383,19 @@ async function run() {
             res.send(result)
         })
 
-        // app.get('/comments/comment/:id', async (req, res) => {
-        //     const id = req.params.id
-        //     const query = { _id: new ObjectId(id) }
-        //     const result = await surveyDataCollection.findOne(query)
-        //     res.send(result);
-        // })
+        app.post('/report/:id', async (req, res) => {
+            const report = req.body
+            const id = req.params.id
+            const query = { _id: new ObjectId(id) }
+            const update = {
+                $push: {
+                    report: report
+                }
+            }
+            const result = await surveyDataCollection.updateOne(query, update)
+
+            res.send(result)
+        })
 
 
         // await client.db("admin").command({ ping: 1 });

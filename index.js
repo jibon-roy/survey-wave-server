@@ -348,6 +348,8 @@ async function run() {
                     totalLike: addLike.user
                 }
             }
+            const unlike = await surveyDataCollection.findOne(query)
+            const isUnlike = unlike?.totalDisLike
             const result = await surveyDataCollection.updateOne(query, update)
             res.send(result)
 

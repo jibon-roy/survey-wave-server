@@ -349,7 +349,7 @@ async function run() {
                 }
             }
             const unlike = await surveyDataCollection.findOne(query)
-            const isUnlike = unlike?.totalDisLike
+            // const isUnlike = unlike?.totalDisLike
             const result = await surveyDataCollection.updateOne(query, update)
             res.send(result)
 

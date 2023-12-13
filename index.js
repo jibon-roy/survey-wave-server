@@ -349,7 +349,11 @@ async function run() {
                 }
             }
             const unlike = await surveyDataCollection.findOne(query)
-            // const isUnlike = unlike?.totalDisLike
+            const unlikeList = unlike?.totalDisLike
+            const isUnlike = unlikeList.filter(gmail => addLike.user === gmail)
+            if (isUnlike) {
+                await surveyDataCollection.deleteOne(query, { $pull: { totalDisLike: isUnlike } },)
+            }
             const result = await surveyDataCollection.updateOne(query, update)
             res.send(result)
 

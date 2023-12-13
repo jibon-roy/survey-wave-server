@@ -369,6 +369,12 @@ async function run() {
                     totalDisLike: addLike.user
                 }
             }
+            const like = await surveyDataCollection.findOne(query)
+            const likeList = like?.totalLike
+            const isLike = likeList.filter(gmail => addLike.user === gmail)
+            if (isLike) {
+                await surveyDataCollection.deleteOne(query, { $pull: { totalDisLike: isLike } },)
+            }
             const result = await surveyDataCollection.updateOne(query, update)
             res.send(result)
 
